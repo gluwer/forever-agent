@@ -15,11 +15,16 @@ function ForeverAgent(options) {
   self.freeSockets = {}
   self.maxSockets = self.options.maxSockets || Agent.defaultMaxSockets
   self.minSockets = self.options.minSockets || ForeverAgent.defaultMinSockets
+  self.maxKeepAliveTime = self.options.maxKeepAliveTime || ForeverAgent.defaultMaxKeepAliveTime
   self.on('free', function(socket, host, port) {
     var name = host + ':' + port
-    if (self.requests[name] && self.requests[name].length) {
+    if (!socket.destroyed && self.requests[name] && self.requests[name].length) {
       self.requests[name].shift().onSocket(socket)
-    } else if (self.sockets[name].length < self.minSockets) {
+      if (self.requests[name].length === 0) {
+        // don't leak
+        delete self.requests[name]
+      }
+    } else if (!socket.destroyed && self.sockets[name].length < self.minSockets || self.maxKeepAliveTime > 0) {
       if (!self.freeSockets[name]) self.freeSockets[name] = []
       self.freeSockets[name].push(socket)
       
@@ -29,11 +34,12 @@ function ForeverAgent(options) {
       }
       socket._onIdleError = onIdleError
       socket.on('error', onIdleError)
+      if (self.maxKeepAliveTime && socket._events && Array.isArray(socket._events.timeout)) {
+        socket.removeAllListeners('timeout');
+        // Restore the socket's setTimeout() that was remove as collateral damage.
+        socket.setTimeout(self.maxKeepAliveTime, socket._maxKeepAliveTimeout);
+      }
     } else {
-      // If there are no pending requests just destroy the
-      // socket and it will get removed from the pool. This
-      // gets us out of timeout issues and allows us to
-      // default to Connection:keep-alive.
       socket.destroy()
     }
   })
@@ -42,13 +48,14 @@ function ForeverAgent(options) {
 util.inherits(ForeverAgent, Agent)
 
 ForeverAgent.defaultMinSockets = 5
+ForeverAgent.defaultMaxKeepAliveTime = 0; // 0 means it is turned off
 
 
 ForeverAgent.prototype.createConnection = net.createConnection
 ForeverAgent.prototype.addRequestNoreuse = Agent.prototype.addRequest
 ForeverAgent.prototype.addRequest = function(req, host, port) {
   var name = host + ':' + port
-  if (this.freeSockets[name] && this.freeSockets[name].length > 0 && !req.useChunkedEncodingByDefault) {
+  if (this.freeSockets[name] && this.freeSockets[name].length > 0) { //  && !req.useChunkedEncodingByDefault (not an issue if not streaming)
     var idleSocket = this.freeSockets[name].pop()
     idleSocket.removeListener('error', idleSocket._onIdleError)
     delete idleSocket._onIdleError
@@ -58,6 +65,18 @@ ForeverAgent.prototype.addRequest = function(req, host, port) {
     this.addRequestNoreuse(req, host, port)
   }
 }
+Agent.prototype.createSocket = function (name, host, port, localAddress, req) {
+  var self = this
+  var socket = Agent.prototype.createSocket.call(this, name, host, port, localAddress, req)
+  if (self.maxKeepAliveTime) {
+    socket._maxKeepAliveTimeout = function () {
+      socket.destroy()
+    };
+    socket.setTimeout(self.maxKeepAliveTime, socket._maxKeepAliveTimeout)
+  }
+  return socket;
+};
+
 
 ForeverAgent.prototype.removeSocket = function(s, name, host, port) {
   if (this.sockets[name]) {
