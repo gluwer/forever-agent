@@ -1,5 +1,5 @@
-module.exports = ForeverAgent
-ForeverAgent.SSL = ForeverAgentSSL
+module.exports = ForeverAgent2
+ForeverAgent2.SSL = ForeverAgent2SSL
 
 var util = require('util')
   , Agent = require('http').Agent
@@ -7,15 +7,15 @@ var util = require('util')
   , tls = require('tls')
   , AgentSSL = require('https').Agent
 
-function ForeverAgent(options) {
+function ForeverAgent2(options) {
   var self = this
   self.options = options || {}
   self.requests = {}
   self.sockets = {}
   self.freeSockets = {}
   self.maxSockets = self.options.maxSockets || Agent.defaultMaxSockets
-  self.minSockets = self.options.minSockets || ForeverAgent.defaultMinSockets
-  self.maxKeepAliveTime = self.options.maxKeepAliveTime || ForeverAgent.defaultMaxKeepAliveTime
+  self.minSockets = self.options.minSockets || ForeverAgent2.defaultMinSockets
+  self.maxKeepAliveTime = self.options.maxKeepAliveTime || ForeverAgent2.defaultMaxKeepAliveTime
   self.on('free', function(socket, host, port) {
     var name = host + ':' + port
     if (!socket.destroyed && self.requests[name] && self.requests[name].length) {
@@ -45,15 +45,15 @@ function ForeverAgent(options) {
   })
 
 }
-util.inherits(ForeverAgent, Agent)
+util.inherits(ForeverAgent2, Agent)
 
-ForeverAgent.defaultMinSockets = 5
-ForeverAgent.defaultMaxKeepAliveTime = 0 // 0 means it is turned off
+ForeverAgent2.defaultMinSockets = 5
+ForeverAgent2.defaultMaxKeepAliveTime = 0 // 0 means it is turned off
 
 
-ForeverAgent.prototype.createConnection = net.createConnection
-ForeverAgent.prototype.addRequestNoreuse = Agent.prototype.addRequest
-ForeverAgent.prototype.addRequest = function(req, host, port) {
+ForeverAgent2.prototype.createConnection = net.createConnection
+ForeverAgent2.prototype.addRequestNoreuse = Agent.prototype.addRequest
+ForeverAgent2.prototype.addRequest = function(req, host, port) {
   var name = host + ':' + port
   if (this.freeSockets[name] && this.freeSockets[name].length > 0) { //  && !req.useChunkedEncodingByDefault (not an issue if not streaming)
     var idleSocket = this.freeSockets[name].pop()
@@ -65,7 +65,7 @@ ForeverAgent.prototype.addRequest = function(req, host, port) {
     this.addRequestNoreuse(req, host, port)
   }
 }
-ForeverAgent.prototype.createSocket = function (name, host, port, localAddress, req) {
+ForeverAgent2.prototype.createSocket = function (name, host, port, localAddress, req) {
   var self = this
   var socket = Agent.prototype.createSocket.call(this, name, host, port, localAddress, req)
   if (self.maxKeepAliveTime) {
@@ -78,7 +78,7 @@ ForeverAgent.prototype.createSocket = function (name, host, port, localAddress, 
 };
 
 
-ForeverAgent.prototype.removeSocket = function(s, name, host, port) {
+ForeverAgent2.prototype.removeSocket = function(s, name, host, port) {
   if (this.sockets[name]) {
     var index = this.sockets[name].indexOf(s)
     if (index !== -1) {
@@ -107,13 +107,13 @@ ForeverAgent.prototype.removeSocket = function(s, name, host, port) {
   }
 }
 
-function ForeverAgentSSL (options) {
-  ForeverAgent.call(this, options)
+function ForeverAgent2SSL (options) {
+  ForeverAgent2.call(this, options)
 }
-util.inherits(ForeverAgentSSL, ForeverAgent)
+util.inherits(ForeverAgent2SSL, ForeverAgent2)
 
-ForeverAgentSSL.prototype.createConnection = createConnectionSSL
-ForeverAgentSSL.prototype.addRequestNoreuse = AgentSSL.prototype.addRequest
+ForeverAgent2SSL.prototype.createConnection = createConnectionSSL
+ForeverAgent2SSL.prototype.addRequestNoreuse = AgentSSL.prototype.addRequest
 
 function createConnectionSSL (port, host, options) {
   if (typeof port === 'object') {
