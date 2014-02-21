@@ -24,10 +24,10 @@ function ForeverAgent(options) {
         // don't leak
         delete self.requests[name]
       }
-    } else if (!socket.destroyed && self.sockets[name].length < self.minSockets || self.maxKeepAliveTime > 0) {
+    } else if (!socket.destroyed && (self.sockets[name].length < self.minSockets || self.maxKeepAliveTime > 0)) {
       if (!self.freeSockets[name]) self.freeSockets[name] = []
       self.freeSockets[name].push(socket)
-      
+
       // if an error happens while we don't use the socket anyway, meh, throw the socket away
       var onIdleError = function() {
         socket.destroy()
@@ -48,7 +48,7 @@ function ForeverAgent(options) {
 util.inherits(ForeverAgent, Agent)
 
 ForeverAgent.defaultMinSockets = 5
-ForeverAgent.defaultMaxKeepAliveTime = 0; // 0 means it is turned off
+ForeverAgent.defaultMaxKeepAliveTime = 0 // 0 means it is turned off
 
 
 ForeverAgent.prototype.createConnection = net.createConnection
@@ -65,7 +65,7 @@ ForeverAgent.prototype.addRequest = function(req, host, port) {
     this.addRequestNoreuse(req, host, port)
   }
 }
-Agent.prototype.createSocket = function (name, host, port, localAddress, req) {
+ForeverAgent.prototype.createSocket = function (name, host, port, localAddress, req) {
   var self = this
   var socket = Agent.prototype.createSocket.call(this, name, host, port, localAddress, req)
   if (self.maxKeepAliveTime) {
@@ -89,7 +89,7 @@ ForeverAgent.prototype.removeSocket = function(s, name, host, port) {
     delete this.sockets[name]
     delete this.requests[name]
   }
-  
+
   if (this.freeSockets[name]) {
     var index = this.freeSockets[name].indexOf(s)
     if (index !== -1) {
